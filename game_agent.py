@@ -4,7 +4,6 @@ and include the results in your report.
 """
 import random
 
-
 class SearchTimeout(Exception):
     """Subclass base exception for code clarity. """
     pass
@@ -35,7 +34,9 @@ def custom_score(game, player):
         The heuristic value of the current game state to the specified player.
     """
     # TODO: finish this function!
-    raise NotImplementedError
+    number_of_my_moves = len(game.get_legal_moves(player))
+    number_of_opponent_moves = len(game.get_legal_moves(game.inactive_player))
+    return float(number_of_my_moves - number_of_opponent_moves)
 
 
 def custom_score_2(game, player):
@@ -213,7 +214,43 @@ class MinimaxPlayer(IsolationPlayer):
             raise SearchTimeout()
 
         # TODO: finish this function!
-        raise NotImplementedError
+        def min_value(board, depth, current_depth):
+            if self.time_left() < self.TIMER_THRESHOLD:
+                raise SearchTimeout()
+            utility = board.utility(self)
+            current_depth += 1
+            if utility != 0 or current_depth >= depth:
+                return self.score(board, self)
+            value = float("inf")
+            legal_moves = board.get_legal_moves()
+            for move in legal_moves:
+                child_board = board.forecast_move(move)
+                value = min(value, max_value(child_board, depth, current_depth))
+            return value
+
+        def max_value(board, depth, current_depth):
+            if self.time_left() < self.TIMER_THRESHOLD:
+                raise SearchTimeout()
+            utility = board.utility(self)
+            current_depth += 1
+            if utility != 0 or current_depth >= depth:
+                return self.score(board, self)
+            value = float("-inf")
+            legal_moves = board.get_legal_moves()
+            for move in legal_moves:
+                child_board = board.forecast_move(move)
+                value = max(value, min_value(child_board, depth, current_depth))
+            return value
+
+        current_depth = 0
+        moves = game.get_legal_moves()
+        scores = []
+        for move in moves:
+            child_board = game.forecast_move(move)
+            value = min_value(child_board, depth, current_depth)
+            scores.append(value)
+        best_score_index = scores.index(max(scores))
+        return moves[best_score_index]
 
 
 class AlphaBetaPlayer(IsolationPlayer):
@@ -253,9 +290,24 @@ class AlphaBetaPlayer(IsolationPlayer):
             (-1, -1) if there are no available legal moves.
         """
         self.time_left = time_left
+        self.search_depth = 1
 
-        # TODO: finish this function!
-        raise NotImplementedError
+        # Initialize the best move so that this function returns something
+        # in case the search fails due to timeout
+        best_move = (-1, -1)
+
+        try:
+            # The try/except block will automatically catch the exception
+            # raised when the timer is about to expire.
+            while True:
+                best_move = self.alphabeta(game, self.search_depth)
+                self.search_depth += 1
+
+        except SearchTimeout:
+            pass  # Handle any actions required after timeout as needed
+
+        # Return the best move from the last completed search iteration
+        return best_move
 
     def alphabeta(self, game, depth, alpha=float("-inf"), beta=float("inf")):
         """Implement depth-limited minimax search with alpha-beta pruning as
@@ -306,4 +358,49 @@ class AlphaBetaPlayer(IsolationPlayer):
             raise SearchTimeout()
 
         # TODO: finish this function!
-        raise NotImplementedError
+        def max_value(board, depth, current_depth, alpha, beta):
+            if self.time_left() < self.TIMER_THRESHOLD:
+                raise SearchTimeout()
+            utility = board.utility(self)
+            if utility != 0 or current_depth >= depth:
+                # Since this is a terminal state, returns (-1, -1) as there are no moves available
+                return self.score(board, self), (-1, -1)
+            current_depth += 1
+            scores, moves = [], []
+            legal_moves = board.get_legal_moves()
+            for move in legal_moves:
+                child_board = board.forecast_move(move)
+                # Assume that the child is a terminal node, so we only care about the utility it brings back
+                child_util, _ = min_value(child_board, depth, current_depth, alpha, beta)
+                if child_util >= beta:
+                    return child_util, move
+                alpha = max(alpha, child_util)
+                scores.append(child_util)
+                moves.append(move)
+            best_score_index = scores.index(max(scores))
+            return scores[best_score_index], moves[best_score_index]
+
+        def min_value(board, depth, current_depth, alpha, beta):
+            if self.time_left() < self.TIMER_THRESHOLD:
+                raise SearchTimeout()
+            utility = board.utility(self)
+            if utility != 0 or current_depth >= depth:
+                return self.score(board, self), (-1, -1)
+            current_depth += 1
+            scores, moves = [], []
+            legal_moves = board.get_legal_moves()
+            for move in legal_moves:
+                child_board = board.forecast_move(move)
+                child_util, _ = max_value(child_board, depth, current_depth, alpha, beta)
+                if child_util <= alpha:
+                    return child_util, move
+                beta = min(beta, child_util)
+                scores.append(child_util)
+                moves.append(move)
+            best_score_index = scores.index(min(scores))
+            return scores[best_score_index], moves[best_score_index]
+
+        current_depth = 0
+        # We don't care about the bound at this point, just the move we need to make
+        _, move = max_value(game, depth, current_depth, alpha, beta)
+        return move
