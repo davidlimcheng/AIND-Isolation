@@ -34,9 +34,27 @@ def custom_score(game, player):
         The heuristic value of the current game state to the specified player.
     """
     # TODO: finish this function!
-    number_of_my_moves = len(game.get_legal_moves(player))
-    number_of_opponent_moves = len(game.get_legal_moves(game.inactive_player))
-    return float(number_of_my_moves - number_of_opponent_moves)
+    # Similar to the improved_score method in sample_players.py, but goes one step deeper and gets
+    # the total number of moves for child nodes as well.
+    if game.is_loser(player):
+        return float("-inf")
+
+    if game.is_winner(player):
+        return float("inf")
+
+    my_moves = game.get_legal_moves(player)
+    opponent_moves = game.get_legal_moves(game.get_opponent(player))
+    my_moves_total = len(my_moves)
+    opponent_moves_total = len(opponent_moves)
+    for move in my_moves:
+        child_board = game.forecast_move(move)
+        child_board_moves = child_board.get_legal_moves(player)
+        my_moves_total += len(child_board_moves)
+    for move in opponent_moves:
+        child_board = game.forecast_move(move)
+        child_board_moves = child_board.get_legal_moves(game.get_opponent(player))
+        opponent_moves_total += len(child_board_moves)
+    return float(my_moves_total - opponent_moves_total)
 
 
 def custom_score_2(game, player):
@@ -62,7 +80,39 @@ def custom_score_2(game, player):
         The heuristic value of the current game state to the specified player.
     """
     # TODO: finish this function!
-    raise NotImplementedError
+    # Splits the board into 9 3x3 "units", and evaluates how many remaining spaces
+    # are on the units the player is currently on.
+    # Occupation of multiple units are more heavily weighted via a multiplier.
+
+    if game.is_loser(player):
+        return float("-inf")
+
+    if game.is_winner(player):
+        return float("inf")
+
+    units = [
+        [(0, 0), (1, 0), (2, 0), (0, 1), (1, 1), (2, 1), (0, 2), (1, 2), (2, 2)],
+        [(2, 0), (3, 0), (4, 0), (2, 1), (3, 1), (4, 1), (2, 2), (3, 2), (4, 2)],
+        [(4, 0), (5, 0), (6, 0), (4, 1), (5, 1), (6, 1), (4, 2), (5, 2), (6, 2)],
+        [(0, 2), (1, 2), (2, 2), (0, 3), (1, 3), (2, 3), (0, 4), (1, 4), (2, 4)],
+        [(2, 2), (3, 2), (4, 2), (2, 3), (3, 3), (4, 3), (2, 4), (3, 4), (4, 4)],
+        [(4, 2), (5, 2), (6, 2), (4, 3), (5, 3), (6, 3), (4, 4), (5, 4), (6, 4)],
+        [(0, 4), (1, 4), (2, 4), (0, 5), (1, 5), (2, 5), (0, 6), (1, 6), (2, 6)],
+        [(2, 4), (3, 4), (4, 4), (2, 5), (3, 5), (4, 5), (2, 6), (3, 6), (4, 6)],
+        [(4, 4), (5, 4), (6, 4), (4, 5), (5, 5), (6, 5), (4, 6), (5, 6), (6, 6)]
+    ]
+    units_occupied = 0
+    blank_spaces_in_units = []
+    pos = game.get_player_location(player)
+    blank_spaces = game.get_blank_spaces()
+    for unit in units:
+        if pos in unit:
+            units_occupied += 1
+            for space in blank_spaces:
+                if space in unit:
+                    blank_spaces_in_units.append(space)
+    unique_blank_spaces = len(set(blank_spaces_in_units))
+    return float(units_occupied * unique_blank_spaces)
 
 
 def custom_score_3(game, player):
@@ -88,7 +138,23 @@ def custom_score_3(game, player):
         The heuristic value of the current game state to the specified player.
     """
     # TODO: finish this function!
-    raise NotImplementedError
+    # A mix of both improved_score and center_score, but gives more weight to improved_score since it seems to be
+    # doing a bit better in the tournament.
+    if game.is_loser(player):
+        return float("-inf")
+
+    if game.is_winner(player):
+        return float("inf")
+
+    own_moves = len(game.get_legal_moves(player))
+    opp_moves = len(game.get_legal_moves(game.get_opponent(player)))
+    improved_score_util = float(own_moves - opp_moves)
+
+    w, h = game.width / 2., game.height / 2.
+    y, x = game.get_player_location(player)
+    center_score_util = float((h - y)**2 + (w - x)**2)
+
+    return (0.75 * improved_score_util) + (0.25 * center_score_util)
 
 
 class IsolationPlayer:
@@ -244,6 +310,8 @@ class MinimaxPlayer(IsolationPlayer):
 
         current_depth = 0
         moves = game.get_legal_moves()
+        if not len(moves):
+            return -1, -1
         scores = []
         for move in moves:
             child_board = game.forecast_move(move)
