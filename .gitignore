@@ -94,7 +94,10 @@ ENV/
 # Rope project settings
 .ropeproject
 
+# End of https://www.gitignore.io/api/python
+
 # Pycharm stuff
 .idea/
 
-# End of https://www.gitignore.io/api/python
+# MS Word files used for PDF type-ups
+*.docx
